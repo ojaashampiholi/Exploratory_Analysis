@@ -1,0 +1,103 @@
+---
+title: "2018 vote switchers: Getting started"
+author: "S470/670"
+date: "Last updated `r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, tidy = TRUE)
+set.seed(470670)
+```
+
+Load libraries:
+
+```{r, message = FALSE}
+library(tidyverse)
+```
+
+Load data:
+
+```{r}
+DFP = read.csv("DFP_WTHH_release.csv")
+DFP = as_tibble(DFP)
+```
+
+```{r, eval = FALSE}
+names(DFP)
+```
+
+```{r}
+n = nrow(DFP)
+n
+```
+
+## Reproducing toplines
+
+We want to check that we can get topline statistics that are close to the percentages published by Data for Progress here:
+
+https://wthh.dataforprogress.org/get-the-data
+
+Try it for the Age variable, without survey weights:
+
+```{r}
+group_by(DFP, age5) %>% summarise(Proportion = n()/n)
+```
+
+These are way off. Instead, use weights:
+
+```{r}
+group_by(DFP, age5) %>% summarise(`Weighted proportion` = sum(weight_DFP)/n)
+```
+
+This is still a bit different from the numbers given by Data for Progress (because survey weights are more complex than we pretend they are in this class), but it's much closer.
+
+Try a weighted summary for `house3`, the main variable for 2018 vote:
+
+```{r}
+group_by(DFP, house3) %>% summarise(`Weighted proportion` = sum(weight_DFP)/n)
+```
+
+Again, it's not exactly right, but it's close.
+
+
+
+## Vote switchers
+
+Vote switchers can be determined from the following variables:
+
+presvote16post: 1: Clinton, 2: Trump, 3-6: Other, 7: DNV
+
+house3: 1: Dem, 2: GOP, 3: other/DNV
+
+Non-Clinton to Dem:
+
+```{r}
+NC2D = (DFP$presvote16post != 1 & DFP$house3 == 1)
+table(NC2D, useNA = "ifany")
+```
+
+Non-Trump to Rep:
+
+```{r}
+NT2R = (DFP$presvote16post != 2 & DFP$house3 == 2)
+table(NT2R, useNA = "ifany")
+```
+
+Vote switchers are non-Clinton to Dem or non-Trump to Rep:
+
+```{r}
+switcher = (NC2D | NT2R)
+table(switcher, useNA = "ifany")
+```
+
+Subset the vote switchers:
+
+```{r}
+switchers = DFP[switcher != FALSE,]
+nrow(switchers)
+```
+
+The 465 vote-switchers include 291 for whom NC2D was true, 171 for whom NT2R was true, and 3 NA to Dem or Rep.
+
+

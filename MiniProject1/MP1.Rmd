@@ -1,0 +1,169 @@
+---
+title: "MP1"
+author: "Sudip Padhye"
+date: "2/13/2020"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(tidycensus)
+library(rio)
+library(broom)
+library(mgcv)
+cb_palette = c("#999999", "#E69F00", "#56B4E9", "#009E73",
+    "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+```
+
+
+1]
+```{r}
+housePriceData = import("State_and_US_SA.xls")
+housePriceData = housePriceData[5:545, 1:52]
+```
+
+```{r}
+# change column name
+colNames = as.list(housePriceData[1,])
+names(housePriceData) = colNames
+housePriceData = housePriceData[-c(1),]  #deletes first data row of column names
+```
+
+```{r}
+period.list = strsplit(as.character(housePriceData$Month), "M")
+period.list = matrix(unlist(period.list), byrow = T, ncol = 2)
+Year = period.list[, 1]
+Month = period.list[, 2]
+housePriceData$Month = Month
+housePriceData$Year = Year
+housePriceData = data.frame(lapply(housePriceData, as.numeric), stringsAsFactors=FALSE)
+```
+
+```{r}
+state_abbrev = as.data.frame(read.delim(file = "state_abbrevs.txt", header = TRUE, sep = " "))
+state_abbrev = data.frame(lapply(state_abbrev, as.character), stringsAsFactors=FALSE)
+stateCode = as.array(state_abbrev$Code)
+
+housePriceData = housePriceData %>%
+  gather(key = "Code", value = "Price", stateCode)
+```
+
+```{r}
+housePriceData = inner_join(housePriceData, state_abbrev, by = "Code")
+housePriceData.avgPriceUS = aggregate(Price ~ Year, FUN = mean, data = housePriceData)
+housePriceData.avgPriceRegion = aggregate(Price ~ Year + Region, FUN = mean, data = housePriceData)
+housePriceData.avgPriceState = aggregate(Price ~ Year + State, FUN = mean, data = housePriceData)
+```
+
+```{r}
+ggplot(housePriceData.avgPriceUS, aes(x = Year, y = Price)) +
+  geom_point() +
+  geom_smooth(method="gam", formula = y~s(x), se = FALSE) +
+  ggtitle("Year Vs. Housing Price") +
+  xlab("Year") +
+  ylab("Housing Price")
+```
+
+```{r}
+housePriceData.avgPriceUS.lm = gam(Price ~ s(Year), data = housePriceData.avgPriceUS,  se = FALSE)
+housePriceData.avgPriceUS.lm.df = augment(housePriceData.avgPriceUS.lm)
+housePriceData.avgPriceUS.resid.means = aggregate(.resid ~ Year, mean, data = housePriceData.avgPriceUS.lm.df)
+
+ggplot(housePriceData.avgPriceUS.resid.means, aes(x = Year, y=.resid)) + 
+  geom_point() + 
+  geom_abline(slope = 0) +
+  geom_smooth(method = "gam", formula = y ~ s(x), se = FALSE, color = "orange") +
+  ggtitle('Residual of Year Vs. Housing Price')
+
+summary(housePriceData.avgPriceUS.lm)
+```
+
+
+```{r}
+ggplot(housePriceData.avgPriceState, aes(x = Year, y = Price)) +
+  geom_point(aes(color = State)) +
+#  facet_wrap(~ State, ncol = 1) + 
+  geom_smooth(method="gam", formula = y ~ s(x), se = FALSE) +
+  geom_jitter() +
+  ggtitle("Statewise Year Vs. Housing Price") +
+  xlab("Year") +
+  ylab("Housing Price")
+```
+
+```{r}
+housePriceData.avgPriceState.lm = gam(Price ~ s(Year), data = housePriceData.avgPriceState,  se = FALSE)
+housePriceData.avgPriceState.lm.df = augment(housePriceData.avgPriceState.lm)
+housePriceData.avgPriceState.resid.means = aggregate(.resid ~ Year, mean, data = housePriceData.avgPriceState.lm.df)
+
+ggplot(housePriceData.avgPriceState.resid.means, aes(x = Year, y=.resid)) + 
+  geom_point() + 
+  geom_abline(slope = 0) +
+  geom_smooth(method = "gam", formula = y ~ s(x), se = FALSE, color = "orange") +
+  ggtitle('Residual of Statewise Year Vs. Housing Price')
+
+summary(housePriceData.avgPriceState.lm)
+```
+
+
+
+```{r}
+ggplot(housePriceData.avgPriceRegion, aes(x = Year, y = Price)) +
+  geom_point(aes(color = Region)) +
+  facet_wrap(~ Region, ncol = 2) + 
+  geom_smooth(method = "gam", formula = y ~ s(x), se = FALSE) +
+  scale_color_manual(values = cb_palette) +
+  ggtitle("Regionwise Year Vs. Housing Price") +
+  xlab("Year") +
+  ylab("Housing Price")
+```
+
+
+```{r}
+housePriceData.avgPriceRegion.lm = gam(Price ~ s(Year), data = housePriceData.avgPriceRegion,  se = FALSE)
+housePriceData.avgPriceRegion.lm.df = augment(housePriceData.avgPriceRegion.lm)
+housePriceData.avgPriceRegion.resid.means = aggregate(.resid ~ Year, mean, data = housePriceData.avgPriceRegion.lm.df)
+
+ggplot(housePriceData.avgPriceRegion.resid.means, aes(x = Year, y=.resid)) + 
+  geom_point() + 
+  geom_abline(slope = 0) +
+  geom_smooth(method = "gam", formula = y ~ s(x), se = FALSE, color = "orange") +
+  scale_color_manual(values = cb_palette) +
+  ggtitle('Residual of Regionwise Year Vs. Housing Price')
+
+summary(housePriceData.avgPriceRegion.lm)
+```
+
+
+2]
+
+```{r}
+#census_api_key("7d1623036e7fa95f8648555c07c9e017b394ecca")
+census1990 = get_decennial(geography = "state", variables = "P0010001", year = 1990)
+census1990['Year'] = 1990
+census1990 = census1990[c('Year', 'NAME', 'value')]
+
+census2000 = get_decennial(geography = "state", variables = "P001001", year = 2000)
+census2000['Year'] = 2000
+census2000 = census2000[c('Year', 'NAME', 'value')]
+
+census2010 = get_decennial(geography = "state", variables = "P001001", year = 2010)
+census2010['Year'] = 2010
+census2010 = census2010[c('Year', 'NAME', 'value')]
+#census2010 = census2010[-c(52),]
+
+# census2018 = get_decennial(geography = "state", variables = "P001001", year = 2018)
+
+censusData = rbind(rbind(census1990, census2000), census2010)
+```
+
+```{r}
+ggplot(censusData, aes(x = Year, y = value)) +
+  geom_point(aes(color = NAME)) +
+#  facet_wrap(~ NAME, ncol = 2) + 
+  geom_smooth(method = "lm", se = FALSE) +
+  geom_jitter() +
+  ggtitle("Census 1900-2018") +
+  xlab("Year") +
+  ylab("Population")
+```

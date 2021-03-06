@@ -1,0 +1,340 @@
+---
+title: "MiniProject1"
+author: "Ojaas Hampiholi"
+date: "2/15/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(tidycensus)
+library(rio)
+library(broom)
+library(mgcv)
+library(dplyr)
+library(gridExtra)
+cb_palette = c("#999999", "#E69F00", "#56B4E9", "#009E73",
+    "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+```
+
+Key is dcede92dc65722d616da79d0a47a759893f274e4
+
+Population1990 %>%
+  rename(value = Population1990)
+
+```{r}
+#census_api_key("dcede92dc65722d616da79d0a47a759893f274e4")
+Population1990 <- get_decennial(geography = "state", variables = "P0010001", year = 1990)
+Population1990 = as.data.frame((Population1990))
+Population1990 <- Population1990[c(2,4)]
+names(Population1990)[names(Population1990) == "value"] <- "Population1990"
+head(Population1990)
+#View(Population1990)
+```
+
+```{r}
+Population2000 <- get_decennial(geography = "state", variables = "P001001", year = 2000)
+Population2000 = as.data.frame(Population2000)
+names(Population2000)[names(Population2000) == "value"] <- "Population2000"
+Population2000 = as.data.frame((Population2000))
+Population2000 <- Population2000[c(2,4)]
+
+head(Population2000)
+#View(Population2000)
+```
+
+```{r}
+Population2010 <- get_decennial(geography = "state", variables = "P001001", year = 2010)
+Population2010 = as.data.frame(Population2010)
+names(Population2010)[names(Population2010) == "value"] <- "Population2010"
+Population2010 = as.data.frame((Population2010))
+Population2010 <- Population2010[c(2,4)]
+head(Population2010)
+#View(Population2010)
+
+Population2018 <- get_estimates(geography = "state", product = "population")
+Population2018 = as.data.frame(population2018)
+names(Population2018)[names(Population2018) == "value"] <- "Population2018"
+Population2018 <- Population2018[c(1,4)]
+Population2018 = Population2018[1:52,]
+head(Population2018)
+#View(Population2018)
+```
+
+```{r}
+state_abbrev = as.data.frame(read.delim(file = "state_abbrevs.txt", header = TRUE, sep = " "))
+state_abbrev = data.frame(lapply(state_abbrev, as.character), stringsAsFactors=FALSE)
+names(state_abbrev)[names(state_abbrev)=="State"] <- "NAME"
+head(state_abbrev)
+#View(state_abbrev)
+```
+
+```{r}
+populationChanges = inner_join(state_abbrev, Population1990, by = "NAME")
+populationChanges = inner_join(populationChanges, Population2000, by = "NAME")
+populationChanges = inner_join(populationChanges, Population2010, by = "NAME")
+populationChanges = inner_join(populationChanges, Population2018, by = "NAME")
+#View(populationChanges)
+
+
+head(populationChanges)
+#View(populationChanges)
+```
+
+
+```{r, fig.height=8}
+
+#populationChanges$change1018 = populationChanges$Population2018 - populationChanges$Population2010
+#populationChanges$change0010 = populationChanges$Population2010 - populationChanges$Population2000
+#populationChanges$change9000 = populationChanges$Population2000 - populationChanges$Population1990
+
+#populationChanges$changePercent1018 = (populationChanges$Population2018 - populationChanges$Population2010) / #populationChanges$Population2010
+#populationChanges$changePercent0010 = (populationChanges$Population2010 - populationChanges$Population2000) / #populationChanges$Population2000
+#populationChanges$changePercent9000 = (populationChanges$Population2000 - populationChanges$Population1990) / #populationChanges$Population1990
+
+
+ggplot(populationChanges, aes(x = reorder(Code, change0010), y = value, color = ColorsIndicate)) +
+    geom_point(aes(y = change9000, col = "change9000")) + 
+    geom_point(aes(y = change0010, col = "change0010")) +
+    geom_point(aes(y = change1018, col = "change1018")) +
+  facet_wrap(Region ~ .) +
+  #geom_smooth(method="gam", formula = y~s(x), se = FALSE) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  ggtitle("Population Density Change by Region") +
+  xlab("State") +
+  ylab("Population Change")
+```
+
+```{r, fig.height=8}
+ggplot(populationChanges, aes(x = reorder(Code, changePercent1018), y = value, color = ColorsIndicate)) +
+    geom_point(aes(y = changePercent9000, col = "changePercent9000")) + 
+    geom_point(aes(y = changePercent0010, col = "changePercent0010")) +
+    geom_point(aes(y = changePercent1018, col = "changePercent1018")) +
+  facet_wrap(Region ~ .) +
+  #geom_smooth(method="gam", formula = y~s(x), se = FALSE) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  ggtitle("Percent Population Density Change by Region") +
+  xlab("State") +
+  ylab("Population Change")
+```
+
+```{r}
+ggplot(populationChanges, aes(x =  reorder(Code, change9000), y = value, color = ColorsIndicate)) + 
+    geom_point(aes(y = change9000, col = "change9000")) + 
+    geom_point(aes(y = change0010, col = "change0010")) +
+    geom_point(aes(y = change1018, col = "change1018")) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  
+```
+
+
+
+
+```{r}
+jan1990 = housePriceData[housePriceData$Month == 1 & housePriceData$Year == 1990, ]
+dec1999 = housePriceData[housePriceData$Month == 12 & housePriceData$Year == 1999, ]
+dec1999$Difference = dec1999$Price - jan1990$Price
+
+
+jan2000 = housePriceData[housePriceData$Month == 1 & housePriceData$Year == 2000, ]
+dec2009 = housePriceData[housePriceData$Month == 12 & housePriceData$Year == 2009, ]
+dec2009$Difference = dec2009$Price - jan2000$Price
+
+jan2010 = housePriceData[housePriceData$Month == 1 & housePriceData$Year == 2010, ]
+dec2018 = housePriceData[housePriceData$Month == 12 & housePriceData$Year == 2018, ]
+dec2018$Difference = dec2018$Price - jan2010$Price
+
+```
+  
+  
+  
+```{r}
+newHousingData = inner_join(dec1999, dec2009, by = "Code")
+newHousingData = inner_join(newHousingData, dec2018, by = "Code")
+newHousingData <- newHousingData[c(3,8:10,19,28)]
+names(newHousingData)[names(newHousingData)=="State.x"] <- "State"
+names(newHousingData)[names(newHousingData)=="Region.x"] <- "Region"
+names(newHousingData)[names(newHousingData)=="Difference.x"] <- "Decade99"
+names(newHousingData)[names(newHousingData)=="Difference.y"] <- "Decade09"
+names(newHousingData)[names(newHousingData)=="Difference"] <- "Decade18"
+```
+  
+```{r}
+newPopulation = populationChanges[c(2,11:13)]
+question3Data = inner_join(newHousingData, newPopulation, by = "Code")
+```
+  
+  
+```{r fig.width=10 , fig.height=10, echo =FALSE}
+library(gridExtra)
+p1 = ggplot(question3Data, aes(x = changePercent1018, y = abs(Decade18))) + geom_point(alpha = 0.2) + geom_smooth(se = FALSE) + geom_text(aes(label = Code), size = 3) 
+p2 = ggplot(question3Data, aes(x = changePercent0010, y = abs(Decade09))) + geom_point(alpha = 0.2) + geom_smooth() + geom_text(aes(label = Code))
+p3 = ggplot(question3Data, aes(x = changePercent9000, y = abs(Decade99))) + geom_point(alpha = 0.2) + geom_smooth() + geom_text(aes(label = Code))
+
+grid.arrange(p1, p2, p3, nrow = 3, ncol = 1)
+
+```
+  
+```{r}
+q3RegionalData = gather(question3Data, key = "Decade", value = "HousingPrices",
+       Decade99, Decade09, Decade18)
+q3RegionalData = gather(q3RegionalData, key = "Years", value = "PopulationChanges",
+       changePercent9000, changePercent0010, changePercent1018)
+```
+  
+
+
+```{r}
+x = q3RegionalData[q3RegionalData$State == 'California', ]
+x
+```
+
+
+
+
+```{r fig.height=12, fig.width=12}
+ggplot(q3RegionalData, aes(x = PopulationChanges, y = HousingPrices, color = Decade)) + geom_point() + facet_wrap(State~.)
+```
+
+-
+
+```{r fig.height=8, fig.width=12}
+ggplot(question3Data, aes(x = PopulationChanges, y = HousingPrices, color = Decade)) + geom_point() + geom_smooth(se = FALSE, method = 'loess', degree = 0.001) + facet_grid(Region~.)
+```
+
+
+
+
+
+
+
+
+
+
+
+    ggtitle("Changes in Population by Decade") +
+    xlab("State") +
+    ylab("Population Change")
+```
+
+
+```{r}
+ggplot(populationChanges, aes(x =  reorder(Code, changePercent9000), y = value, color = ColorsIndicate)) + 
+    geom_point(aes(y = changePercent9000, col = "changePercent9000")) + 
+    geom_point(aes(y = changePercent0010, col = "changePercent0010")) +
+    geom_point(aes(y = changePercent1018, col = "changePercent1018")) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    ggtitle("Percent Changes in Population by Decade") +
+    xlab("State") +
+    ylab("Population Change")
+```
+
+```{r, fig.height=8}
+ggplot(populationChanges, aes(x = reorder(Region, change0010), y = value, color = ColorsIndicate)) +
+    geom_point(aes(y = change9000, col = "change9000")) + 
+    geom_point(aes(y = change0010, col = "change0010")) +
+    geom_point(aes(y = change1018, col = "change1018")) +
+  facet_wrap(Code ~ .) +
+  #geom_smooth(method="gam", formula = y~s(x), se = FALSE) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  ggtitle("Population Density Change by State") +
+  xlab("State") +
+  ylab("Population Change")
+```
+
+```{r, fig.height=8}
+ggplot(populationChanges, aes(x = reorder(Region, change0010), y = value, color = ColorsIndicate)) +
+    geom_point(aes(y = changePercent9000, col = "changePercent9000")) + 
+    geom_point(aes(y = changePercent0010, col = "changePercent0010")) +
+    geom_point(aes(y = changePercent1018, col = "changePercent1018")) +
+  facet_wrap(Code ~ .) +
+  #geom_smooth(method="gam", formula = y~s(x), se = FALSE) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  ggtitle("Percent Population Density Change by State") +
+  xlab("State") +
+  ylab("Population Change")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+housingData = housePriceData[c(1:4,8,9)]
+
+jan1990 = housePriceData[housePriceData$Month == 1 & housePriceData$Year == 1990, ]
+dec1999 = housePriceData[housePriceData$Month == 12 & housePriceData$Year == 1999, ]
+dec1999$HousingPriceChange1999 = dec1999$Price - jan1990$Price
+dec1999 = dec1999[c(3,8:10)]
+
+jan2000 = housePriceData[housePriceData$Month == 1 & housePriceData$Year == 2000, ]
+dec2009 = housePriceData[housePriceData$Month == 12 & housePriceData$Year == 2009, ]
+dec2009$HousingPriceChange2009 = dec2009$Price - jan2000$Price
+dec2009 = dec2009[c(3,8:10)]
+
+jan2010 = housePriceData[housePriceData$Month == 1 & housePriceData$Year == 2010, ]
+dec2018 = housePriceData[housePriceData$Month == 12 & housePriceData$Year == 2018, ]
+dec2018$HousingPriceChange2018 = dec2018$Price - jan2010$Price
+dec2018 = dec2018[c(3,8:10)]
+
+housingPriceChange = inner_join(dec1999, dec2009, by = "Code")
+housingPriceChange = inner_join(housingPriceChange, dec2018, by = "Code")
+housingPriceChange = housingPriceChange[c(1,4,7:10)]
+
+populationChanges$PopulationChange1999 = populationChanges$Population2000 - populationChanges$Population1990
+populationChanges$PopulationChange2009 = populationChanges$Population2010 - populationChanges$Population2000
+populationChanges$PopulationChange2018 = populationChanges$Population2018 - populationChanges$Population2010
+populationChanges = populationChanges[-c(4:7)]
+
+populationHousingData = inner_join(housingPriceChange, populationChanges, by = "Code")
+populationHousingData = populationHousingData[-c(7, 8)]
+populationHousingData = populationHousingData[c(1, 4, 5, 2, 3, 6:9)]
+
+populationHousingData1999 = populationHousingData[c(1:4, 7)]
+populationHousingData1999$Year = 1999
+names(populationHousingData1999)[names(populationHousingData1999)=="HousingPriceChange1999"] <- "HousingPriceChange"
+names(populationHousingData1999)[names(populationHousingData1999)=="PopulationChange1999"] <- "PopulationChange"
+
+populationHousingData2009 = populationHousingData[c(1:3, 5, 8)]
+populationHousingData2009$Year = 2009
+names(populationHousingData2009)[names(populationHousingData2009)=="HousingPriceChange2009"] <- "HousingPriceChange"
+names(populationHousingData2009)[names(populationHousingData2009)=="PopulationChange2009"] <- "PopulationChange"
+
+populationHousingData2018 = populationHousingData[c(1:3, 6, 9)]
+populationHousingData2018$Year = 2018
+names(populationHousingData2018)[names(populationHousingData2018)=="HousingPriceChange2018"] <- "HousingPriceChange"
+names(populationHousingData2018)[names(populationHousingData2018)=="PopulationChange2018"] <- "PopulationChange"
+
+populationHousingData = populationHousingData1999
+populationHousingData = rbind(populationHousingData, populationHousingData2009)
+populationHousingData = rbind(populationHousingData, populationHousingData2018)
+
+library(viridis)
+#cb_palette = c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+ 
+```
+
+```{r}
+ggplot(populationHousingData, aes(x = log(abs(PopulationChange)), y = HousingPriceChange, group = Year, color = Year)) +
+  geom_point() +
+  geom_smooth(method = "rlm", se = FALSE) + 
+  ggtitle("Population Change Vs. Housing Price Change") +
+  xlab("Population Change") +
+  ylab("Housing Price Change") +
+#  scale_color_manual(values = cb_palette) +
+  scale_color_viridis() +
+  facet_wrap(Region.x ~ .)
+```

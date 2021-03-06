@@ -1,0 +1,304 @@
+---
+title: "Untitled"
+author: "Ojaas Hampiholi"
+date: "4/7/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(GGally)
+library(pROC)
+library(tidyverse)
+library(broom)
+library(MASS)
+library(arm)
+library(mgcv)
+library(boot)
+```
+
+```{r}
+matches = read.csv("matches.csv")
+matches = matches[c(1:3,5:8,11)]
+matches = na.omit(matches)
+```
+
+```{r}
+#droping teams
+matches = subset(matches, team1 != 'Gujarat Lions')
+matches = subset(matches, team2 != 'Gujarat Lions')
+matches = subset(matches, team1 != 'Rising Pune Supergiant')
+matches = subset(matches, team2 != 'Rising Pune Supergiant')
+matches = subset(matches, team1 != 'Rising Pune Supergiants')
+matches = subset(matches, team2 != 'Rising Pune Supergiants')
+matches = subset(matches, team1 != 'Pune Warriors')
+matches = subset(matches, team2 != 'Pune Warriors')
+matches = subset(matches, team1 != 'Kochi Tuskers Kerala')
+matches = subset(matches, team2 != 'Kochi Tuskers Kerala')
+```
+
+```{r}
+#rename teams
+matches = data.frame(lapply(matches, function(x) {
+  gsub("Delhi Daredevils", "Delhi Capitals", x)
+}))
+matches = data.frame(lapply(matches, function(x) {
+  gsub("Deccan Chargers", "Sunrisers Hyderabad", x)
+}))
+
+homegrounds = c('Mumbai', 'Bangalore', 'Kolkata', 'Delhi', 'Chandigarh', 'Jaipur', 'Chennai', 'Hyderabad')
+
+matches = subset(matches, city %in% homegrounds)
+```
+
+```{r}
+tossAdvantage = mean(as.character(matches$toss_winner) == as.character(matches$winner)) *100
+#print("The percentage of times that the team that wins the toss also goes on to win the match is")
+tossAdvantage
+```
+
+```{r}
+matches = matches[matches$winner != '', ]
+matches$winner = factor(matches$winner)
+#toss.adv = matches
+matches$toss_winner = as.factor(matches$toss_winner)
+matches$winner = as.factor(matches$winner)
+matches$win = ifelse(matches$toss_winner == matches$winner, 1, 0)
+```
+
+```{r}
+tossAdvYear <- matches %>% group_by(season, city)
+
+tossAdvYear = tossAdvYear %>% summarise(
+  winRatio = mean(win)
+)
+
+tossAdvYear
+```
+
+```{r, fig.height=7, fig.width= 8}
+ggplot(tossAdvYear, aes(x = season, y = winRatio, fill = city)) + facet_wrap(.~city, ncol = 2) +
+  geom_bar(position = "dodge", stat = "identity") + xlab("Seasons") +
+  ylab("Winner Percentage") + ggtitle("Percentage of winning the match on winning the toss")
+```
+
+```{r}
+
+```
+
+
+
+
+
+
+
+```{r}
+tossAdvCity <- matches %>% group_by(season,city)
+
+tossAdvCity = tossAdvCity %>% summarise(
+  winRatio = mean(win)
+)
+
+tossAdvCity
+```
+
+```{r}
+ggplot(tossAdvCity, aes(x = season, y = winRatio, color = city)) + geom_line(group = 1) + #facet_wrap(.~city) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+```{r}
+library(dplyr)
+deliveries = read.csv("deliveries.csv")
+names(deliveries)[names(deliveries) == "match_id"] <- "id"
+deliveries$id = as.factor(deliveries$id)
+matches$id = as.factor(matches$id)
+masterData = inner_join(matches, deliveries, by = "id")
+```
+
+```{r}
+drops = c('batsman','bowler','non_striker','is_super_over','wide_runs','bye_runs',
+          'legbye_runs','noball_runs','penalty_runs','batsman_runs','extra_runs','player_dismissed',
+          'dismissal_kind','fielder','team1','team2','win_by_runs','win_by_wickets')
+masterData = masterData[, !names(masterData) %in% drops]
+masterData$inning = as.factor(masterData$inning)
+masterData$ball = as.factor(masterData$ball)
+```
+
+```{r}
+subMaster <- masterData %>% group_by(season, inning, toss_winner, winner, city, win)
+
+#subMaster1 = aggregate(masterData, FUN = sum, by = list(masterData$season))
+
+subMaster = subMaster %>% summarise(
+  total_runs = sum(total_runs)
+)
+subMaster = subMaster[subMaster$inning !=5,]
+subMaster = subMaster[subMaster$inning !=4,]
+subMaster = subMaster[subMaster$inning !=3,]
+subMaster
+```
+
+
+```{r}
+tossLogit = glm(win ~ toss_winner + city + season,family = binomial, 
+                               data = subMaster)
+tossLogit
+```
+
+```{r}
+#subMaster$win = as.factor(subMaster$win)
+
+sigmoid = function(x){
+ coe = coef(tossLogit)
+ 
+ total_coef = length(coe)
+ y = coe[1]
+ for(i in 2:total_coef)
+ {
+    y = y + coe[i] * x^(i-1)
+ }
+ 
+ return(inv.logit(y))
+}
+
+pred = predict(tossLogit, type = "response", newdata = subMaster)
+predicted_logit_model_1 <- ifelse(pred > 0.4, 1, 0)
+accuracy <- mean(subMaster$win == predicted_logit_model_1 )
+accuracy_df <- data.frame(Model = "Model Accuracy", Accuracy = accuracy, stringsAsFactors = FALSE)
+
+print(paste("Train accuracy for model :",round(accuracy*100,2),"%"))
+
+roc_obj = roc(response = subMaster$win, predictor = predicted_logit_model_1, smoothed = TRUE)
+auc(roc_obj)
+plot(roc_obj, col="red", lwd=3, main="ROC curve")
+```
+
+```{r}
+summary(tossLogit)
+```
+
+```{r, fig.height=6}
+p1 = ggplot(subMaster,aes(x = as.numeric(toss_winner), y = win, color = win)) + 
+  geom_point()+ geom_jitter(width = 0.3, height = 0.4) +
+  geom_smooth(method = 'lm', se = FALSE, color = "blue") +
+  stat_function(fun = sigmoid, color = 'red')
+
+p2 = ggplot(subMaster,aes(x = as.numeric(winner), y = win, color = win)) + 
+  geom_point()+ geom_jitter(width = 0.3, height = 0.4) +
+  geom_smooth(method = 'lm', se = FALSE, color = "blue") +
+  stat_function(fun = sigmoid, color = 'red')
+
+p3 = ggplot(subMaster,aes(x = as.numeric(season), y = win, color = win)) + 
+  geom_point()+ geom_jitter(width = 0.3, height = 0.4) +
+  geom_smooth(method = 'lm', se = FALSE, color = "blue") +
+  stat_function(fun = sigmoid, color = 'red')
+    
+library(gridExtra)
+grid.arrange(p1,p2,p3,ncol = 1)
+```
+
+
+```{r}
+plotToss <- masterData %>% group_by(toss_winner, season)
+
+plotToss = plotToss %>% summarise(
+  wins = mean(win)
+)
+```
+
+```{r, fig.height=5}
+ggplot(plotToss, aes(x= toss_winner, y = wins)) + geom_line(group = 1) + facet_wrap(.~season) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) + xlab("Toss Winning Team") + 
+  ylab("Probability of Winning the game") + ggtitle("Probability of winning the game on winning the toss")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+library(maptools)
+library(rgeos)
+library(ggmap)
+library(scales)
+library(RColorBrewer)
+
+states_shape = readShapeSpatial("IND_adm/IND_adm1.shp")
+#class(states_shape)
+#names(states_shape)
+#print(states_shape$ID_1)
+print(states_shape$NAME_1)
+plot(states_shape, main = "Administrative Map of India")
+```
+
+```{r}
+library(dplyr)
+deliveries = read.csv("deliveries.csv")
+names(deliveries)[names(deliveries) == "match_id"] <- "id"
+deliveries$id = as.factor(deliveries$id)
+matches$id = as.factor(matches$id)
+masterData = inner_join(matches, deliveries, by = "id")
+```
+
+```{r}
+drops = c('batsman','bowler','non_striker','is_super_over','wide_runs','bye_runs',
+          'legbye_runs','noball_runs','penalty_runs','batsman_runs','extra_runs','player_dismissed',
+          'dismissal_kind','fielder','team1','team2','win_by_runs','win_by_wickets')
+masterData = masterData[, !names(masterData) %in% drops]
+masterData$inning = as.factor(masterData$inning)
+masterData$ball = as.factor(masterData$ball)
+```
+
+
+```{r}
+cityCoord = read.csv("City Coordinates.csv")
+cityCoord = cityCoord[,c(1:3)]
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

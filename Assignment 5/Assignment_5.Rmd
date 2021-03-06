@@ -1,0 +1,96 @@
+---
+title: "Assignment 5"
+author: "Ojaas Hampiholi"
+date: "3/12/2020"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r}
+library(NHANES)
+library(tidyverse)
+library(tidyr)
+library(ggplot2)
+library(mgcv)
+library(broom)
+```
+
+```{r}
+vars = c("Age", "Height", "BMI")
+inputData = NHANES[vars]
+inputData = inputData[inputData$Age <18 ,]
+#inputData = DropNA(inputData, Height, message = TRUE)
+#inputData = drop_na(inputData)
+```
+
+## Question 1:
+
+The transformation formula used for fitting the model is given below as follows:
+
+### BMI.gam = gam(BMI ~ s(Age, Height), data = inputData)
+
+## Question 2:
+
+```{r, fig.height=6, fig.width=9}
+ggplot(inputData, aes(x = Height, y= BMI)) + geom_point(size = 1.2,alpha = 0.2) +
+  geom_smooth(method = "gam", formula = y~s(x), se = FALSE) +
+  facet_wrap(~ Age, ncol = 4) + ggtitle("BMI vs Height : Facet by Age")
+```
+
+## Question 3:
+
+```{r}
+library(viridis)
+ggplot(inputData, aes(x = Height, y = BMI, group = Age, color = Age)) + geom_point(alpha =0.2) +
+  scale_color_viridis() + ggtitle("BMI vs Height  : Colour by Age") +
+  geom_smooth(method = "gam",formula = y~s(x), se = FALSE)
+```
+
+## Question 4:
+
+```{r}
+datagam = gam(BMI ~ s(Age)+s(Height), data = inputData)
+BMIgam.grid = expand.grid(Age = seq(0,18,0.1), Height = seq(80,180,0.5))
+datagam.predict = predict(datagam, newdata = BMIgam.grid)
+dataGamPlot.df = data.frame(BMIgam.grid, fit = as.vector(datagam.predict))
+```
+
+```{r, fig.width = 8}
+ggplot(dataGamPlot.df, aes(x = Height, y = Age, z = fit, fill = fit)) + coord_fixed() +
+  geom_raster() + ggtitle("Raster Contour plot for BMI with respect to Age and Height") +
+  scale_fill_distiller(palette = "RdYlBu") +
+  geom_contour()
+```
+
+## Question 5:
+
+From the residual plots we can see that a GAM model fits suitably to the given data. When we look at the graph that shows the relation between Height and BMI faceted  with respect to Age, we can see no clear trend or relation between Height and BMI which is carried the same across all Age groups. When we observe the plot for BMI vs Height which has Age represented by colour, we can once again see no relation between the graphs for BMI vs Height at different Age groups. Keeping the above factors in mind we can say that there is no visible relationship between BMI and Height for the children age group (below 17 years of age). Hence, the main conclusion that can be derived from the data and the plots drawn above is that BMI is not a good measure of body mass for children. 
+
+## Appendix
+
+```{r}
+datagam = gam(BMI ~ s(Age)+s(Height), data = inputData)
+summary(datagam)
+datagam.df = augment(datagam)
+
+ggplot(datagam.df, aes(x = Age, y = .resid)) + geom_point() + xlab("Age") + ylab("Residuals") +
+  ggtitle("Residual Plot for Age") +
+  geom_smooth(method.args = list(degree = 1), se = FALSE)
+
+ggplot(datagam.df, aes(x = Height, y = .resid)) + geom_point() + xlab("Height") + ylab("Residuals") +
+  ggtitle("Residual Plot for Height") +
+  geom_smooth(method.args = list(degree = 1), se = FALSE)
+```
+
+```{r}
+ggplot(dataGamPlot.df, aes(x = Height, y = Age, z = fit)) +
+  coord_fixed() + ggtitle("Contour Plot for BMI variations w.r.t Age and Height denoted by Colour") +
+  scale_color_viridis() +
+  geom_contour(aes(color = ..level..), binwidth = 1)
+```
+

@@ -1,0 +1,77 @@
+---
+title: "Assignment 6"
+author: "Ojaas Hampiholi"
+date: "4/15/2020"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(broom)
+library(tidyverse)
+library(dplyr)
+library(MASS)
+cb_palette = c("#999999", "#E69F00", "#56B4E9", "#009E73",
+    "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+```
+
+
+
+
+```{r}
+barleyData <- as.data.frame(read.delim(file = "minnesota.barley.yield.txt", header = TRUE, sep = " "))
+```
+
+## Question 1)
+
+
+```{r}
+barleyAgg <- barleyData %>%
+  group_by(year, site) %>%
+  summarise(yield=mean(yield))
+```
+
+
+```{r}
+
+ggplot(barleyAgg, aes(x = barleyAgg$year, y = barleyAgg$yield)) +
+ geom_line() +
+  facet_wrap(~ barleyAgg$site) + 
+  ggtitle("Barley Yield over the years") +
+  xlab("Year") +
+  ylab("Barley Yield")
+```
+
+The total yield has a decreasing trend from 1927 to 1936 for all the locations except Waseca. The total yield for Waseca for 1936 is almost as same as 1927.The yield for each locations keeps fluctuating over the years.
+
+
+## Question 2)
+
+
+```{r}
+barleyRLM <- rlm(yield ~ gen +  factor(year) + site,
+psi = psi.bisquare, data = barleyData)
+summary(barleyRLM)
+```
+
+LM tends to fit the data even if the data is a gross outlier, but RLM penalises the outliers in order to follow a better trend in the data. Hence I have used RLM here with yield as response variable and gen, year and site as explanatory variable.
+
+## Question 3)
+
+```{r}
+library(broom)
+barleyData$fit = fitted.values(barleyRLM)
+barleyData$res = residuals(barleyRLM)
+
+
+ggplot(barleyData, aes(x=year,y=fit))+geom_point(alpha = 0.2)+geom_smooth(se=FALSE)+
+  facet_wrap(~site)+
+  ggtitle("Fitted values of yield at each location") +
+  xlab("Year") +
+  ylab("Fitted Values")
+```
+
+
+From the graph, we can see that fitted graph is same over every location and year. We cannot see any unusual change in Morris for the 1931-1932 year.Average yield in 1932 is lower than average yield in 1931 for all the locations including Morris. Thus, Morris 1931-1932 should have been a natural variation and not a mistake in the recordings.

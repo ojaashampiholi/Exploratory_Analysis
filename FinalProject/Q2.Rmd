@@ -1,0 +1,224 @@
+---
+title: "nfskjbdckjsdbckjssdbsdbkjcsdkjvbskjdnclsdcbisd"
+author: "Ojaas Hampiholi"
+date: "4/30/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(GGally)
+library(pROC)
+library(tidyverse)
+library(broom)
+library(MASS)
+library(arm)
+library(mgcv)
+library(boot)
+library(gridExtra)
+```
+
+```{r}
+matches = read.csv("matches.csv")
+matches = matches[c(1:3,5:8,11)]
+matches = na.omit(matches)
+```
+
+```{r}
+#droping teams
+matches = subset(matches, team1 != 'Gujarat Lions')
+matches = subset(matches, team2 != 'Gujarat Lions')
+matches = subset(matches, team1 != 'Rising Pune Supergiant')
+matches = subset(matches, team2 != 'Rising Pune Supergiant')
+matches = subset(matches, team1 != 'Rising Pune Supergiants')
+matches = subset(matches, team2 != 'Rising Pune Supergiants')
+matches = subset(matches, team1 != 'Pune Warriors')
+matches = subset(matches, team2 != 'Pune Warriors')
+matches = subset(matches, team1 != 'Kochi Tuskers Kerala')
+matches = subset(matches, team2 != 'Kochi Tuskers Kerala')
+```
+
+```{r}
+#rename teams
+matches = data.frame(lapply(matches, function(x) {
+  gsub("Delhi Daredevils", "Delhi Capitals", x)
+}))
+matches = data.frame(lapply(matches, function(x) {
+  gsub("Deccan Chargers", "Sunrisers Hyderabad", x)
+}))
+
+homegrounds = c('Mumbai', 'Bangalore', 'Kolkata', 'Delhi', 'Chandigarh', 'Jaipur', 'Chennai', 'Hyderabad')
+
+matches = subset(matches, city %in% homegrounds)
+```
+
+```{r}
+tossAdvantage = mean(as.character(matches$toss_winner) == as.character(matches$winner)) *100
+#print("The percentage of times that the team that wins the toss also goes on to win the match is")
+tossAdvantage
+```
+
+```{r}
+matches = matches[matches$winner != '', ]
+matches$winner = factor(matches$winner)
+#toss.adv = matches
+matches$toss_winner = as.factor(matches$toss_winner)
+matches$winner = as.factor(matches$winner)
+matches$TossAdvantage = ifelse(matches$toss_winner == matches$winner, 1, 0)
+```
+
+```{r}
+colnames(matches)
+```
+
+```{r}
+plotToss = matches %>% group_by(toss_winner)
+
+plotToss = plotToss %>% summarise(
+  winProb = mean(TossAdvantage)
+)
+
+plotToss2 = matches %>% group_by(city)
+
+plotToss2 = plotToss2 %>% summarise(
+  winProb = mean(TossAdvantage)
+)
+```
+
+
+```{r, fig.height= 5}
+
+ggplot(plotToss, aes(x = toss_winner, y = winProb)) + geom_line(group = 1) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+ggplot(plotToss2, aes(x = city, y = winProb)) + geom_line(group = 1) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+#grid.arrange(g1,g2, ncol = 2)
+```
+
+tossLogit = glm(win ~ toss_winner + city + season,family = binomial, 
+                               data = subMaster)
+tossLogit
+
+```{r}
+colnames(matches)
+```
+
+```{r}
+tossLogit = glm(TossAdvantage ~ toss_winner + city, family = binomial, data = matches)
+tossLogit
+```
+
+```{r}
+#subMaster$win = as.factor(subMaster$win)
+
+sigmoid = function(x){
+ coe = coef(tossLogit)
+ 
+ total_coef = length(coe)
+ y = coe[1]
+ for(i in 2:total_coef)
+ {
+    y = y + coe[i] * x^(i-1)
+ }
+ 
+ return(inv.logit(y))
+}
+
+pred = predict(tossLogit, type = "response", newdata = matches)
+predicted_logit_model_1 <- ifelse(pred > 0.5, 1, 0)
+
+accuracy <- mean(matches$TossAdvantage == predicted_logit_model_1 )
+matches$predictedValueBin = predicted_logit_model_1
+matches$predictedValues = pred
+#accuracy_df <- data.frame(Model = "Model Accuracy", Accuracy = accuracy, stringsAsFactors = FALSE)
+
+print(paste("Train accuracy for model :",round(accuracy*100,2),"%"))
+
+roc_obj = roc(response = matches$TossAdvantage, predictor = predicted_logit_model_1, smoothed = TRUE)
+auc(roc_obj)
+plot(roc_obj, col="red", lwd=3, main="ROC curve")
+```
+
+```{r}
+a = matches %>% group_by(toss_winner)
+
+a = a %>% summarise(
+  Prob = mean(TossAdvantage)
+)
+a$Type = "Actual Probability"
+
+b = matches %>% group_by(toss_winner)
+
+b = b %>% summarise(
+  Prob = mean(predictedValueBin)
+)
+b$Type = "Predicted Probability"
+plotToss3 = rbind(a,b)
+```
+
+```{r, fig.height= 5}
+ggplot(plotToss3, aes(x = toss_winner, y = Prob, color = Type, group = Type)) + geom_line() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +scale_color_manual(values=c("blue", "red")) +
+  xlab("Team Names") + ylab("Probability of Winning") +
+  ggtitle("Probability that a Team wins a game on Winning the Toss")
+```
+
+```{r}
+c = matches %>% group_by(city)
+
+c = c %>% summarise(
+  Prob = mean(TossAdvantage)
+)
+c$Type = "Actual Probability"
+
+d = matches %>% group_by(city)
+
+d = d %>% summarise(
+  Prob = mean(predictedValueBin)
+)
+d$Type = "Predicted Probability"
+plotToss4 = rbind(c,d)
+```
+
+```{r}
+ggplot(plotToss4, aes(x = city, y = Prob, color = Type, group = Type)) + geom_line() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +scale_color_manual(values=c("blue", "red")) +
+  xlab("City") + ylab("Probability of Winning") +
+  ggtitle("Probability that a Team wins a game on Winning the Toss according to City")
+```
+
+
+```{r}
+e = matches %>% group_by(city, toss_winner)
+
+e = e %>% summarise(
+  Prob = mean(TossAdvantage)
+)
+e$Type = "Actual Probability"
+
+f = matches %>% group_by(city, toss_winner)
+
+f = f %>% summarise(
+  Prob = mean(predictedValueBin)
+)
+f$Type = "Predicted Probability"
+plotToss5 = rbind(e,f)
+```
+
+```{r, fig.height=6}
+ggplot(plotToss5, aes(x = toss_winner, y = Prob, color = Type, group = Type)) + geom_line() +
+  facet_wrap(.~city) + scale_color_manual(values=c("red", "blue")) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  xlab("Team") + ylab("Probability of Winning") +
+  ggtitle("Probability that a Team wins a game on Winning the Toss wrt to City")
+```
+
+

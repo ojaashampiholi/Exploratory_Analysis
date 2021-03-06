@@ -1,0 +1,414 @@
+---
+title: "MP2_Submission Doc"
+author: "Ojaas Hampiholi"
+date: "4/3/2020"
+output:
+  word_document: default
+  html_document: default
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(data.table)
+library(GGally)
+library(dplyr)
+```
+
+```{r}
+DFP = read.csv("DFP_WTHH_release.csv")
+#head(DFP)
+
+loyalDemocrats = DFP[DFP$presvote16post == 1 & DFP$house3 == 1,]
+loyalRepublicans = DFP[DFP$presvote16post == 2 & DFP$house3 == 2,]
+switchToD = DFP[DFP$presvote16post != 1 & DFP$house3 == 1,]
+switchToR = DFP[DFP$presvote16post != 2 & DFP$house3 == 2,]
+Switchers = rbind(switchToD, switchToR)
+
+myvars <- c("M4A", "GREENJOB", "WEALTH", "MARLEG", "ICE", "GUNS", "POP_1", "POP_2", "POP_3", "weight_DFP")
+switchToD <- switchToD[myvars]
+switchToR <- switchToR[myvars]
+Switchers <- Switchers[myvars]
+loyalDemocrats <- loyalDemocrats[myvars]
+loyalRepublicans <- loyalRepublicans[myvars]
+```
+
+
+## Question 1:
+How do the Switch to R and Switch to D voters differ on the issue variables?
+
+Issue Variables:
+M4A
+GREENJOB
+WEALTH 
+MARLEG
+ICE
+GUNS
+
+POPULISM VARIABLES:
+POP_1
+POP_2
+POP_3
+
+```{r, fig.width=12, fig.height=8}
+switchToD$VoterType= "SwitchToD"
+switchToR$VoterType= "SwitchToR"
+n = nrow(DFP)
+
+nSToD = nrow(switchToD)
+
+DweightedM4A = group_by(switchToD, M4A) %>% summarise(`WeightedValues` = sum(weight_DFP)/nSToD)
+names(DweightedM4A)[1]<-paste("Values")
+DweightedM4A$IssueVariable= "M4A"
+DweightedM4A <- DweightedM4A[c(3,1,2)]
+
+DweightedGREENJOB = group_by(switchToD, GREENJOB) %>% summarise(`WeightedValues` = sum(weight_DFP)/nSToD)
+names(DweightedGREENJOB)[1]<-paste("Values")
+DweightedGREENJOB$IssueVariable= "GREENJOB"
+DweightedGREENJOB <- DweightedGREENJOB[c(3,1,2)]
+
+DweightedWEALTH = group_by(switchToD, WEALTH) %>% summarise(`WeightedValues` = sum(weight_DFP)/nSToD)
+names(DweightedWEALTH)[1]<-paste("Values")
+DweightedWEALTH$IssueVariable= "WEALTH"
+DweightedWEALTH <- DweightedWEALTH[c(3,1,2)]
+
+DweightedMARLEG = group_by(switchToD, MARLEG) %>% summarise(`WeightedValues` = sum(weight_DFP)/nSToD)
+names(DweightedMARLEG)[1]<-paste("Values")
+DweightedMARLEG$IssueVariable= "MARLEG"
+DweightedMARLEG <- DweightedMARLEG[c(3,1,2)]
+
+DweightedICE = group_by(switchToD, ICE) %>% summarise(`WeightedValues` = sum(weight_DFP)/nSToD)
+names(DweightedICE)[1]<-paste("Values")
+DweightedICE$IssueVariable= "ICE"
+DweightedICE <- DweightedICE[c(3,1,2)]
+
+DweightedGUNS = group_by(switchToD, GUNS) %>% summarise(`WeightedValues` = sum(weight_DFP)/nSToD)
+names(DweightedGUNS)[1]<-paste("Values")
+DweightedGUNS$IssueVariable= "GUNS"
+DweightedGUNS <- DweightedGUNS[c(3,1,2)]
+
+newSToD = rbind(DweightedM4A,DweightedGREENJOB)
+newSToD = rbind(newSToD,DweightedWEALTH)
+newSToD = rbind(newSToD,DweightedMARLEG)
+newSToD = rbind(newSToD,DweightedICE)
+newSToD = rbind(newSToD,DweightedGUNS)
+newSToD$SwitchType= "SwitchToD"
+newSToD <- newSToD[c(4,1,2,3)]
+newSToD = na.omit(newSToD)
+
+nSToR = nrow(switchToR)
+
+RweightedM4A = group_by(switchToR, M4A) %>% summarise(`WeightedValues` = sum(weight_DFP)/nSToR)
+names(RweightedM4A)[1]<-paste("Values")
+RweightedM4A$IssueVariable= "M4A"
+RweightedM4A <- RweightedM4A[c(3,1,2)]
+
+RweightedGREENJOB = group_by(switchToR, GREENJOB) %>% summarise(`WeightedValues` = sum(weight_DFP)/nSToR)
+names(RweightedGREENJOB)[1]<-paste("Values")
+RweightedGREENJOB$IssueVariable= "GREENJOB"
+RweightedGREENJOB <- RweightedGREENJOB[c(3,1,2)]
+
+RweightedWEALTH = group_by(switchToR, WEALTH) %>% summarise(`WeightedValues` = sum(weight_DFP)/nSToR)
+names(RweightedWEALTH)[1]<-paste("Values")
+RweightedWEALTH$IssueVariable= "WEALTH"
+RweightedWEALTH <- RweightedWEALTH[c(3,1,2)]
+
+RweightedMARLEG = group_by(switchToR, MARLEG) %>% summarise(`WeightedValues` = sum(weight_DFP)/nSToR)
+names(RweightedMARLEG)[1]<-paste("Values")
+RweightedMARLEG$IssueVariable= "MARLEG"
+RweightedMARLEG <- RweightedMARLEG[c(3,1,2)]
+
+RweightedICE = group_by(switchToR, ICE) %>% summarise(`WeightedValues` = sum(weight_DFP)/nSToR)
+names(RweightedICE)[1]<-paste("Values")
+RweightedICE$IssueVariable= "ICE"
+RweightedICE <- RweightedICE[c(3,1,2)]
+
+RweightedGUNS = group_by(switchToR, GUNS) %>% summarise(`WeightedValues` = sum(weight_DFP)/nSToR)
+names(RweightedGUNS)[1]<-paste("Values")
+RweightedGUNS$IssueVariable= "GUNS"
+RweightedGUNS <- RweightedGUNS[c(3,1,2)]
+
+newSToR = rbind(RweightedM4A,RweightedGREENJOB)
+newSToR = rbind(newSToR,RweightedWEALTH)
+newSToR = rbind(newSToR,RweightedMARLEG)
+newSToR = rbind(newSToR,RweightedICE)
+newSToR = rbind(newSToR,RweightedGUNS)
+newSToR$SwitchType= "SwitchToR"
+newSToR <- newSToR[c(4,1,2,3)]
+newSToR = na.omit(newSToR)
+
+question1Data = rbind(newSToD, newSToR)
+question1Data = question1Data[question1Data$Values != 6, ]
+
+ggplot(question1Data, aes(x = Values, y = WeightedValues, color = SwitchType)) + geom_point() +
+  geom_smooth(method = "loess",se = FALSE,span = 0.95) + 
+  facet_wrap(.~ IssueVariable) + ggtitle("Switch Voter comparision wrt Issue Variables")
+```
+
+While accounting for the trends between the two category of voters namely Switching to Democrats and Switching to Republicans, we get a scale of 1 to 5 with 1 being strong support and 5 means strong opposition, and there is one more value 6 which corresponds to the 'Not Sure' class of voters. While observing the difference between voters of the two swinging categories, we drop the 6 value and consider all other classes i.e. 1 to 5.
+1. In the case of GreenJob variable, we can observe that the voters only differ on the strong support parameter (1), otherwise the graph for both the category of switch voter follows almost the same characteristics.
+2. Strong supporters of Gun Control have a high chance to Switch votes to Democrats whereas as for the voters who neither strongly support nor strongly oppose to Gun Control have a high chance to switch their votes to Republicans.
+3. Voters with strong opposition towards Defunding Immigration and Custom enforcements have a very  high probability to switch votes to Republicans.
+4. Strong supporters of Medicare For All might switch votes to Democrats while strong opposition have a high probability to switch votes to Repiblicans
+5. Legalizing Marijuana has a similar trend with very menial deviations for either category of switch voters.
+6. Strong supporters of Tax on Wealth over $100 million will most probably switch their votes to Democrats, while the people who are bound to Switch votes to Republicans follow a neutral trend throughout the graph.
+
+
+## Question 2
+
+```{r, fig.width=12, fig.height=8}
+nSwitchers = nrow(Switchers)
+
+SwitchersM4A = group_by(Switchers, M4A) %>% summarise(`WeightedValues` = sum(weight_DFP)/nSwitchers)
+names(SwitchersM4A)[1]<-paste("Values")
+SwitchersM4A$IssueVariable= "M4A"
+
+SwitchersGREENJOB = group_by(Switchers, GREENJOB) %>% summarise(`WeightedValues` = sum(weight_DFP)/nSwitchers)
+names(SwitchersGREENJOB)[1]<-paste("Values")
+SwitchersGREENJOB$IssueVariable= "GREENJOB"
+
+SwitchersWEALTH = group_by(Switchers, WEALTH) %>% summarise(`WeightedValues` = sum(weight_DFP)/nSwitchers)
+names(SwitchersWEALTH)[1]<-paste("Values")
+SwitchersWEALTH$IssueVariable= "WEALTH"
+
+SwitchersMARLEG = group_by(Switchers, MARLEG) %>% summarise(`WeightedValues` = sum(weight_DFP)/nSwitchers)
+names(SwitchersMARLEG)[1]<-paste("Values")
+SwitchersMARLEG$IssueVariable= "MARLEG"
+
+SwitchersICE = group_by(Switchers, ICE) %>% summarise(`WeightedValues` = sum(weight_DFP)/nSwitchers)
+names(SwitchersICE)[1]<-paste("Values")
+SwitchersICE$IssueVariable= "ICE"
+
+SwitchersGUNS = group_by(Switchers, GUNS) %>% summarise(`WeightedValues` = sum(weight_DFP)/nSwitchers)
+names(SwitchersGUNS)[1]<-paste("Values")
+SwitchersGUNS$IssueVariable= "GUNS"
+
+newSwitchers = rbind(SwitchersM4A,SwitchersGREENJOB)
+newSwitchers = rbind(newSwitchers,SwitchersWEALTH)
+newSwitchers = rbind(newSwitchers,SwitchersMARLEG)
+newSwitchers = rbind(newSwitchers,SwitchersICE)
+newSwitchers = rbind(newSwitchers,SwitchersGUNS)
+newSwitchers$SwitchType= "Switchers"
+newSwitchers <- newSwitchers[c(4,3,1,2)]
+newSwitchers = na.omit(newSwitchers)
+#head(newSwitchers)
+
+nDemocrats = nrow(loyalDemocrats)
+
+SwitchersM4A = group_by(loyalDemocrats, M4A) %>% summarise(`WeightedValues` = sum(weight_DFP)/nDemocrats)
+names(SwitchersM4A)[1]<-paste("Values")
+SwitchersM4A$IssueVariable= "M4A"
+
+SwitchersGREENJOB = group_by(loyalDemocrats, GREENJOB) %>% summarise(`WeightedValues` = sum(weight_DFP)/nDemocrats)
+names(SwitchersGREENJOB)[1]<-paste("Values")
+SwitchersGREENJOB$IssueVariable= "GREENJOB"
+
+SwitchersWEALTH = group_by(loyalDemocrats, WEALTH) %>% summarise(`WeightedValues` = sum(weight_DFP)/nDemocrats)
+names(SwitchersWEALTH)[1]<-paste("Values")
+SwitchersWEALTH$IssueVariable= "WEALTH"
+
+SwitchersMARLEG = group_by(loyalDemocrats, MARLEG) %>% summarise(`WeightedValues` = sum(weight_DFP)/nDemocrats)
+names(SwitchersMARLEG)[1]<-paste("Values")
+SwitchersMARLEG$IssueVariable= "MARLEG"
+
+SwitchersICE = group_by(loyalDemocrats, ICE) %>% summarise(`WeightedValues` = sum(weight_DFP)/nDemocrats)
+names(SwitchersICE)[1]<-paste("Values")
+SwitchersICE$IssueVariable= "ICE"
+
+SwitchersGUNS = group_by(loyalDemocrats, GUNS) %>% summarise(`WeightedValues` = sum(weight_DFP)/nDemocrats)
+names(SwitchersGUNS)[1]<-paste("Values")
+SwitchersGUNS$IssueVariable= "GUNS"
+
+newDemocrats = rbind(SwitchersM4A,SwitchersGREENJOB)
+newDemocrats = rbind(newDemocrats,SwitchersWEALTH)
+newDemocrats = rbind(newDemocrats,SwitchersMARLEG)
+newDemocrats = rbind(newDemocrats,SwitchersICE)
+newDemocrats = rbind(newDemocrats,SwitchersGUNS)
+newDemocrats$SwitchType= "Democrats"
+newDemocrats <- newDemocrats[c(4,3,1,2)]
+newDemocrats = na.omit(newDemocrats)
+#head(newDemocrats)
+
+nRepublicans = nrow(loyalRepublicans)
+
+SwitchersM4A = group_by(loyalRepublicans, M4A) %>% summarise(`WeightedValues` = sum(weight_DFP)/nRepublicans)
+names(SwitchersM4A)[1]<-paste("Values")
+SwitchersM4A$IssueVariable= "M4A"
+
+SwitchersGREENJOB = group_by(loyalRepublicans, GREENJOB) %>% summarise(`WeightedValues` = sum(weight_DFP)/nRepublicans)
+names(SwitchersGREENJOB)[1]<-paste("Values")
+SwitchersGREENJOB$IssueVariable= "GREENJOB"
+
+SwitchersWEALTH = group_by(loyalRepublicans, WEALTH) %>% summarise(`WeightedValues` = sum(weight_DFP)/nRepublicans)
+names(SwitchersWEALTH)[1]<-paste("Values")
+SwitchersWEALTH$IssueVariable= "WEALTH"
+
+SwitchersMARLEG = group_by(loyalRepublicans, MARLEG) %>% summarise(`WeightedValues` = sum(weight_DFP)/nRepublicans)
+names(SwitchersMARLEG)[1]<-paste("Values")
+SwitchersMARLEG$IssueVariable= "MARLEG"
+
+SwitchersICE = group_by(loyalRepublicans, ICE) %>% summarise(`WeightedValues` = sum(weight_DFP)/nRepublicans)
+names(SwitchersICE)[1]<-paste("Values")
+SwitchersICE$IssueVariable= "ICE"
+
+SwitchersGUNS = group_by(loyalRepublicans, GUNS) %>% summarise(`WeightedValues` = sum(weight_DFP)/nRepublicans)
+names(SwitchersGUNS)[1]<-paste("Values")
+SwitchersGUNS$IssueVariable= "GUNS"
+
+newRepublicans = rbind(SwitchersM4A,SwitchersGREENJOB)
+newRepublicans = rbind(newRepublicans,SwitchersWEALTH)
+newRepublicans = rbind(newRepublicans,SwitchersMARLEG)
+newRepublicans = rbind(newRepublicans,SwitchersICE)
+newRepublicans = rbind(newRepublicans,SwitchersGUNS)
+newRepublicans$SwitchType= "Republicans"
+newRepublicans <- newRepublicans[c(4,3,1,2)]
+newRepublicans = na.omit(newRepublicans)
+#head(newRepublicans)
+
+question2Data = rbind(newSwitchers, newDemocrats)
+question2Data = rbind(question2Data, newRepublicans)
+question2Data = question2Data[question2Data$Values != 6,]
+
+ggplot(question2Data, aes(x = Values, y = WeightedValues, color = SwitchType)) + geom_point() +
+  geom_smooth(method = "loess",se = FALSE, span = 0.85) + 
+  facet_wrap(.~ IssueVariable) + ggtitle("Comparision between Voter Groups on Issue Variables")
+```
+
+Based on the comparision between the Switch voters and the loyal republican as well as democrat voters we can see that two of the given hypothesis can be proven with ease.
+Hypothesis 1 - "On most issues, swing voters are split, with some of them acting more like Democrats and others acting more like Republicans." 
+This hypothesis can be seen very clearly in the Medicine for All variable. The strong supporters if the M4A program tend to have a high probability of switching to Democrats, while the strong opponents of the M4A program tend to have high chances of switching their votes to Republicans.
+Hypothesis 2 - "Swing voters think more like Democrats on some issues and more like Republicans on other issues."
+This hypothesis is proven in all other Issue variables apart from the M4A variable. The switch voters follow the general trend followed by the loyal Republican voters in the ICE (Defunding Immigration and Customs Enforcement) Issue Variable. While for all other issue variables (i.e. Greenjobs program, Gun Control, Marijuana Legalization, Tax on Wealth over $100 Mn), we can see from the graph that the switch voters tend to follow the characteristics of Loyal Democrat voters.
+
+## Question 3
+
+## Question 3 Part A : Model based on Issue Variables
+
+```{r}
+myvars <- c("M4A", "GREENJOB", "WEALTH", "MARLEG", "ICE", "GUNS", "weight_DFP")
+
+Switchers1 <- Switchers[myvars]
+Switchers1$SwitchType= 1
+Switchers1 = na.omit(Switchers1)
+loyalDemocrats1 <- loyalDemocrats[myvars]
+loyalDemocrats1$SwitchType= 0
+loyalDemocrats1 = na.omit(loyalDemocrats1)
+loyalRepublicans1 <- loyalRepublicans[myvars]
+loyalRepublicans1$SwitchType= 0
+loyalRepublicans1 = na.omit(loyalRepublicans1)
+
+issueVariablesData = rbind(Switchers1, loyalRepublicans1)
+issueVariablesData = rbind(issueVariablesData, loyalDemocrats1)
+#issueVariablesData$M4A = issueVariablesData$M4A * issueVariablesData$weight_DFP
+#ggpairs(issueVariablesData)
+
+IVLogit = glm(SwitchType ~ M4A*GREENJOB+MARLEG*WEALTH+ICE*GUNS,family = binomial, 
+                               weights = weight_DFP, data = issueVariablesData)
+summary(IVLogit)
+
+# predicted value graph
+fitdata = expand.grid(GUNS=seq(5), WEALTH=seq(5), ICE=seq(5), MARLEG=seq(5), M4A = seq(5), GREENJOB= seq(5))
+fitdata = as.data.table(fitdata)
+fitdata[['predict']]= as.vector(predict(IVLogit, newdata=fitdata))
+fitdata[,predict:= exp(predict)/(1+exp(predict))]
+```
+
+```{r}
+issueVariablesData = issueVariablesData[issueVariablesData$M4A != 6, ]
+issueVariablesData = issueVariablesData[issueVariablesData$GREENJOB != 6, ]
+issueVariablesData = issueVariablesData[issueVariablesData$MARLEG != 6, ]
+issueVariablesData = issueVariablesData[issueVariablesData$GUNS != 6, ]
+issueVariablesData = issueVariablesData[issueVariablesData$ICE != 6, ]
+issueVariablesData = issueVariablesData[issueVariablesData$WEALTH != 6, ]
+
+summary(issueVariablesData$M4A)
+
+ggplot(issueVariablesData,aes(x = M4A, y = SwitchType, color = SwitchType)) + 
+  geom_point()+ geom_jitter(width = 0.3, height = 0.1) +
+  geom_smooth(method = 'lm', se = FALSE)
+
+ggplot(issueVariablesData,aes(x = GREENJOB, y = SwitchType, color = SwitchType)) + 
+  geom_point()+ geom_jitter(width = 0.3, height = 0.1) +
+  geom_smooth(method = 'lm', se = FALSE)
+
+ggplot(issueVariablesData,aes(x = WEALTH, y = SwitchType, color = SwitchType)) + 
+  geom_point()+ geom_jitter(width = 0.3, height = 0.1) +
+  geom_smooth(method = 'lm', se = FALSE)
+
+ggplot(issueVariablesData,aes(x = MARLEG, y = SwitchType, color = SwitchType)) + 
+  geom_point()+ geom_jitter(width = 0.3, height = 0.1) +
+  geom_smooth(method = 'lm', se = FALSE)
+
+ggplot(issueVariablesData,aes(x = ICE, y = SwitchType, color = SwitchType)) + 
+  geom_point()+ geom_jitter(width = 0.3, height = 0.1) +
+  geom_smooth(method = 'lm', se = FALSE)
+
+ggplot(issueVariablesData,aes(x = GUNS, y = SwitchType, color = SwitchType)) + 
+  geom_point()+ geom_jitter(width = 0.3, height = 0.1) +
+  geom_smooth(method = 'lm', se = FALSE)
+```
+
+## Question 3 Part B : Model based on Pop Variables
+
+```{r}
+myvars <- c("POP_1", "POP_2", "POP_3", "weight_DFP")
+
+Switchers2 <- Switchers[myvars]
+Switchers2$SwitchType= 1
+Switchers2 = na.omit(Switchers2)
+loyalDemocrats2 <- loyalDemocrats[myvars]
+loyalDemocrats2$SwitchType= 0
+loyalDemocrats2 = na.omit(loyalDemocrats2)
+loyalRepublicans2 <- loyalRepublicans[myvars]
+loyalRepublicans2$SwitchType= 0
+loyalRepublicans2 = na.omit(loyalRepublicans2)
+
+popVariablesData = rbind(Switchers2, loyalRepublicans2)
+popVariablesData = rbind(popVariablesData, loyalDemocrats2)
+#issueVariablesData$M4A = issueVariablesData$M4A * issueVariablesData$weight_DFP
+#ggpairs(popVariablesData)
+
+PVLogit = glm(SwitchType ~ POP_1 * POP_2 + POP_3,family = binomial, 
+                               weights = weight_DFP, data = popVariablesData)
+summary(PVLogit)
+
+popVariablesData = popVariablesData[popVariablesData$POP_1 != 6, ]
+popVariablesData = popVariablesData[popVariablesData$POP_2 != 6, ]
+popVariablesData = popVariablesData[popVariablesData$POP_3 != 6, ]
+
+# predicted value graph
+fitdata2 = expand.grid(POP_1=seq(5), POP_2=seq(5), POP_3=seq(5))
+fitdata2 = as.data.table(fitdata2)
+fitdata2[['predict']]= as.vector(predict(PVLogit, newdata=fitdata2))
+fitdata2[,predict:= exp(predict)/(1+exp(predict))]
+```
+
+```{r}
+ggplot(popVariablesData,aes(x = POP_1, y = SwitchType, color = SwitchType)) + 
+  geom_point()+ geom_jitter(width = 0.3, height = 0.1) +
+  geom_smooth(method = 'lm', se = FALSE)
+
+ggplot(popVariablesData,aes(x = POP_2, y = SwitchType, color = SwitchType)) + 
+  geom_point()+ geom_jitter(width = 0.3, height = 0.1) +
+  geom_smooth(method = 'lm', se = FALSE)
+
+ggplot(popVariablesData,aes(x = POP_3, y = SwitchType, color = SwitchType)) + 
+  geom_point()+ geom_jitter(width = 0.3, height = 0.1) +
+  geom_smooth(method = 'lm', se = FALSE)
+```
+
+
+
+
+
+
+
+
+
+
+

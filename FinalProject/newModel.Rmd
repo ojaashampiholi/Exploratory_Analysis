@@ -1,0 +1,390 @@
+---
+title: "NewModel"
+author: "Ojaas Hampiholi"
+date: "5/1/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+```
+
+```{r}
+matches = read.csv("matches.csv")
+matches = matches[c(1:3,5:8,11)]
+matches = na.omit(matches)
+
+matches = subset(matches, team1 != 'Gujarat Lions')
+matches = subset(matches, team2 != 'Gujarat Lions')
+matches = subset(matches, team1 != 'Rising Pune Supergiant')
+matches = subset(matches, team2 != 'Rising Pune Supergiant')
+matches = subset(matches, team1 != 'Rising Pune Supergiants')
+matches = subset(matches, team2 != 'Rising Pune Supergiants')
+matches = subset(matches, team1 != 'Pune Warriors')
+matches = subset(matches, team2 != 'Pune Warriors')
+matches = subset(matches, team1 != 'Kochi Tuskers Kerala')
+matches = subset(matches, team2 != 'Kochi Tuskers Kerala')
+
+matches = data.frame(lapply(matches, function(x) {
+  gsub("Delhi Daredevils", "Delhi Capitals", x)
+}))
+matches = data.frame(lapply(matches, function(x) {
+  gsub("Deccan Chargers", "Sunrisers Hyderabad", x)
+}))
+
+
+
+homegrounds = c('Mumbai', 'Bangalore', 'Kolkata', 'Delhi', 'Chandigarh', 'Jaipur', 'Chennai', 'Hyderabad')
+
+matches = subset(matches, city %in% homegrounds)
+```
+
+```{r}
+deliveries = read.csv("deliveries.csv")
+deliveries$match_id = as.character(deliveries$match_id)
+matches$id = as.character(matches$id)
+```
+
+```{r}
+homeTeam = read.csv("hometeams.csv")
+colnames(homeTeam)[1] <- 'city'  
+```
+
+```{r}
+newData = deliveries %>% 
+  left_join(matches, by = c("match_id" = "id"))
+#newData = left_join(deliveries, matches, by = 'match_id = id')
+newData = newData[c(1,2,5,6,18, 22:28)]
+newData = na.omit(newData)
+
+newData = subset(newData, inning != 3)
+newData = subset(newData, inning != 4)
+newData = subset(newData, inning != 5)
+```
+
+
+```{r}
+newData = newData %>%
+  left_join(homeTeam, by = c("city" = "city"))
+```
+
+```{r}
+colnames(newData)
+```
+
+```{r}
+tossAdvantage = mean(as.character(newData$toss_winner) == as.character(newData$winner)) *100
+#print("The percentage of times that the team that wins the toss also goes on to win the match is")
+tossAdvantage
+```
+
+
+```{r}
+newData = newData[newData$winner != '', ]
+matches$winner = factor(matches$winner)
+#toss.adv = matches
+newData$toss_winner = as.factor(newData$toss_winner)
+newData$winner = as.factor(newData$winner)
+newData = newData[newData$winner != '', ]
+newData$tossAdvantage = ifelse(as.character(newData$toss_winner) == as.character(newData$winner), 1, 0)
+newData$homeAdvantage = ifelse(as.character(newData$winner) == as.character(newData$hometeam), 1, 0)
+
+newData$homeTeamBatsFirst  = with(newData, 
+                     ifelse(as.character(hometeam) == as.character(toss_winner) & toss_decision == 'bat', 1, 
+                     ifelse(as.character(hometeam) != as.character(toss_winner) & toss_decision == 'field', 1, 0)))
+newData = newData[ , -which(names(newData) %in% c("city", "abbr"))]
+#names(newData)[!names(newData) %in% c(),]
+```
+
+```{r}
+overRate1 <- newData %>% group_by(match_id, inning, over)
+
+overRate1 = overRate1 %>% summarise(
+  sumRate = sum(total_runs)
+)
+
+
+overRate = overRate1 %>% group_by(inning, over)
+overRate = overRate %>% summarise(
+  avgRate = mean(sumRate)
+)
+overRate$inning = as.factor(overRate$inning)
+```
+
+```{r}
+ggplot(overRate, aes(x = over, y = avgRate, group = inning, color = inning)) + geom_line() +
+  xlab("Over") +
+ ylab("Runs") + ggtitle("Average Runs Scored per over") +
+  scale_color_manual(values=c("blue", "red")) +
+  theme(axis.text.x = element_text(angle = 0, hjust = 1)) 
+  
+```
+
+
+```{r}
+ggplot(overRate, aes(x = over, y = avgRate, fill = inning)) + facet_wrap(.~inning, ncol = 2) +
+  geom_bar(position = "dodge", stat = "identity") + xlab("Seasons") +
+  ylab("Winner Percentage") + ggtitle("Percentage of winning the match on winning the toss") +
+  theme(axis.text.x = element_text(angle = 5, hjust = 1))
+```
+
+
+```{r}
+colnames(newData)
+```
+
+```{r}
+tossAdvYear <- newData %>% group_by(season, toss_winner)
+
+tossAdvYear = tossAdvYear %>% summarise(
+  winRatio = mean(tossAdvantage)
+)
+
+tossAdvYear
+```
+
+```{r, fig.height=7, fig.width= 8}
+ggplot(tossAdvYear, aes(x = season, y = winRatio, fill = toss_winner)) + facet_wrap(.~toss_winner, ncol = 2) +
+  geom_bar(position = "dodge", stat = "identity") + xlab("Seasons") +
+  ylab("Winner Percentage") + ggtitle("Percentage of winning the match on winning the toss") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+```{r}
+colnames(newData)
+```
+
+
+```{r}
+#newData & runsData by match_id
+
+modelData = newData %>% group_by(match_id, inning, toss_winner, hometeam, toss_decision, winner, tossAdvantage,homeAdvantage, homeTeamBatsFirst)
+
+modelData = modelData %>% summarise(
+  total_runs = sum(total_runs)
+)
+```
+
+
+```{r}
+# Toss Advantage
+#hometeam * toss_winner + total_runs
+model1 = glm(tossAdvantage ~ hometeam * toss_winner + total_runs, data = modelData, 
+                     family = binomial)
+summary(model1)
+library(pROC)
+
+sigmoid = function(x){
+ coe = coef(model1)
+ 
+ total_coef = length(coe)
+ y = coe[1]
+ for(i in 2:total_coef)
+ {
+    y = y + coe[i] * x^(i-1)
+ }
+ 
+ return(inv.logit(y))
+}
+
+a = modelData
+pred = predict(model1, type = "response", newdata = modelData)
+predicted_logit_model_1 <- ifelse(pred > 0.5, 1, 0)
+a$predBin = predicted_logit_model_1
+a$predicted = pred
+
+accuracy <- mean(modelData$tossAdvantage == predicted_logit_model_1 )
+#accuracy_df <- data.frame(Model = "Model Accuracy", Accuracy = accuracy, stringsAsFactors = FALSE)
+print(paste("Train accuracy for model :",round(accuracy*100,2),"%"))
+
+roc_obj = roc(response = modelData$tossAdvantage, predictor = predicted_logit_model_1, smoothed = TRUE)
+auc(roc_obj)
+plot(roc_obj, col="red", lwd=3, main="ROC curve")
+```
+
+```{r}
+colnames(a)
+```
+
+```{r}
+b1 = a %>% group_by(toss_winner)
+
+b1 = b1 %>% summarise(
+  pred = mean(predBin)
+)
+b1$Type = "Predicted"
+
+b2 = a %>% group_by(toss_winner)
+
+b2 = b2 %>% summarise(
+  pred = mean(tossAdvantage)
+)
+b2$Type = "Actual"
+
+tossPlot = rbind(b1,b2)
+```
+
+```{r, fig.height=7, fig.width= 8}
+ggplot(tossPlot, aes(x = as.numeric(toss_winner), y = pred, fill = Type)) + facet_wrap(.~Type) +
+  geom_bar(position = "dodge", stat = "identity")  +
+  scale_x_discrete(name="Teams", limits=c('CSK', 'DC', 'KXIP','KKR', 'MI', 	'RR','RCB', 'SRH')) +
+  ylab("Winner Percentage") + ggtitle("Percentage of winning the match on winning the toss") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+
+
+
+
+
+```{r}
+a1 = a %>% group_by(toss_winner, toss_decision)
+
+a1 = a1 %>% summarise(
+  pred = mean(predicted)
+)
+colnames(a1)
+```
+
+```{r, fig.height=7, fig.width= 8}
+ggplot(a1, aes(x = as.numeric(toss_winner), y = pred, fill = toss_decision)) + facet_wrap(.~toss_decision, ncol = 2) +
+  geom_bar(position = "dodge", stat = "identity")  +
+    scale_x_discrete(name="Teams", limits=c('CSK', 'DC', 'KXIP','KKR', 'MI', 	'RR','RCB', 'SRH')) +
+  ylab("Winner Percentage") + ggtitle("Percentage of winning the match based on toss choice") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+```{r}
+colnames(a)
+```
+
+```{}
+a2 = a %>% group_by(hometeam, homeTeamBatsFirst)
+
+a2 = a2 %>% summarise(
+  pred = mean(predicted)
+)
+colnames(a1)
+```
+
+```{}
+a2$homeTeamBatsFirst = as.factor(a2$homeTeamBatsFirst)
+ggplot(a2, aes(x = as.numeric(hometeam), y = pred, fill = homeTeamBatsFirst)) + 
+  facet_wrap(.~homeTeamBatsFirst, ncol = 2) +
+  geom_bar(position = "dodge", stat = "identity")  +
+    scale_x_discrete(name="Teams", limits=c('CSK', 'DC', 'KXIP','KKR', 'MI', 	'RR','RCB', 'SRH')) +
+  ylab("Winner Percentage") + ggtitle("Percentage of winning the match") +
+  labs(subtitle = "0: Home Team Fields First  ; 1: Home Team Bats First") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+
+```{r}
+colnames(modelData)
+```
+
+
+```{r}
+#runsData = modelData[modelData$total_runs <=500,]
+
+runsData = modelData
+ggplot(runsData,aes(x = total_runs, y = tossAdvantage, color = tossAdvantage)) + facet_wrap(.~toss_decision) +
+  geom_point()+ geom_jitter(width = 0.3, height = 0.05) +
+  geom_smooth(method = 'glm', se = FALSE, color = "blue") 
+```
+
+
+
+
+```{r, fig.height=6, fig.width=4}
+p1 = ggplot(modelData,aes(x = as.numeric(toss_decision), y = tossAdvantage, color = tossAdvantage)) + 
+  geom_point()+ geom_jitter(width = 0.3, height = 0.2) +
+  geom_smooth(method = 'glm', se = FALSE, color = "blue") 
+
+p2 = ggplot(modelData,aes(x = as.numeric(toss_winner), y = tossAdvantage, color = tossAdvantage)) + 
+  geom_point()+ geom_jitter(width = 0.3, height = 0.2) +
+  geom_smooth(method = 'glm', se = FALSE, color = "blue") 
+
+p3 = ggplot(modelData,aes(x = total_runs, y = tossAdvantage, color = tossAdvantage)) + 
+  geom_point()+ geom_jitter(width = 0.3, height = 0.2) +
+  geom_smooth(method = 'glm', se = FALSE, color = "blue") 
+    
+library(gridExtra)
+grid.arrange(p1,p2,p3,ncol = 1)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+colnames(modelData)
+```
+
+
+```{r}
+# Home Advantage
+
+model2 = glm(homeAdvantage ~ hometeam * total_runs + toss_winner * toss_decision *
+               tossAdvantage , data = modelData, 
+                     family = binomial)
+summary(model1)
+library(pROC)
+
+sigmoid = function(x){
+ coe = coef(model2)
+ 
+ total_coef = length(coe)
+ y = coe[1]
+ for(i in 2:total_coef)
+ {
+    y = y + coe[i] * x^(i-1)
+ }
+ 
+ return(inv.logit(y))
+}
+
+pred = predict(model2, type = "response", newdata = modelData)
+b = modelData[,"homeAdvantage"]
+predicted_logit_model_2 <- ifelse(pred > 0.54, 1, 0)
+b$predBin = predicted_logit_model_2
+b$predicted = pred
+
+accuracy <- mean(modelData$homeAdvantage == predicted_logit_model_2 )
+#accuracy_df <- data.frame(Model = "Model Accuracy", Accuracy = accuracy, stringsAsFactors = FALSE)
+print(paste("Train accuracy for model :",round(accuracy*100,2),"%"))
+
+roc_obj = roc(response = modelData$homeAdvantage, predictor = predicted_logit_model_2, smoothed = TRUE)
+auc(roc_obj)
+plot(roc_obj, col="red", lwd=3, main="ROC curve")
+```
+
+

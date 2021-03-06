@@ -1,0 +1,324 @@
+---
+title: "FinalQuestion3"
+author: "Meet Valia"
+date: "4/27/2020"
+output: word_document
+---
+
+```{r}
+library(ggplot2)
+library(RColorBrewer)
+library(ggmap)
+library(maps)
+library(rgdal)
+library(scales)
+library(maptools)
+library(gridExtra)
+library(rgeos)
+library(dplyr)
+library(pROC)
+```
+
+```{r}
+matches = read.csv("matches.csv")
+deliveries = read.csv("deliveries.csv")
+```
+
+
+```{r}
+colnames(deliveries)[1] <- "id"
+
+matches = left_join(matches, deliveries, by = 'id')
+```
+
+```{r}
+drops = c('season', 'date', 'result', 'dl_applied', 'player_of_match', 'venue', 'umpire1', 'umpire2', 'umpire3', 'over', 'ball', 'batsman', 'non_striker', 'bowler', 'is_super_over', 'wide_runs', 'bye_runs', 'legbye_runs', 'noball_runs', 'penalty_runs', 'batsman_runs', 'extra_runs', 'player_dismissed', 'dismissal_kind', 'fielder')
+
+matches = matches[, !names(matches) %in% drops]
+```
+
+```{r}
+matches = aggregate(total_runs ~ ., FUN = sum, data = matches)
+```
+
+```{r}
+matches = matches[matches$inning != 3, ]
+matches = matches[matches$inning != 4, ]
+matches = matches[matches$inning != 5, ]
+matches$inning = factor(matches$inning)
+unique(matches$inning)
+
+```
+
+
+```{r}
+#droping teams
+matches = subset(matches, team1 != 'Gujarat Lions')
+matches = subset(matches, team2 != 'Gujarat Lions')
+matches = subset(matches, team1 != 'Rising Pune Supergiant')
+matches = subset(matches, team2 != 'Rising Pune Supergiant')
+matches = subset(matches, team1 != 'Rising Pune Supergiants')
+matches = subset(matches, team2 != 'Rising Pune Supergiants')
+matches = subset(matches, team1 != 'Pune Warriors')
+matches = subset(matches, team2 != 'Pune Warriors')
+matches = subset(matches, team1 != 'Kochi Tuskers Kerala')
+matches = subset(matches, team2 != 'Kochi Tuskers Kerala')
+```
+
+```{r}
+#rename teams
+matches = data.frame(lapply(matches, function(x) {
+  gsub("Delhi Daredevils", "Delhi Capitals", x)
+}))
+matches = data.frame(lapply(matches, function(x) {
+  gsub("Deccan Chargers", "Sunrisers Hyderabad", x)
+}))
+```
+
+```{r}
+unique(matches$winner)
+```
+
+```{r}
+homegrounds = c('Mumbai', 'Bangalore', 'Kolkata', 'Delhi', 'Chandigarh', 'Jaipur', 'Chennai', 'Hyderabad')
+
+matches = subset(matches, city %in% homegrounds)
+```
+
+
+```{r}
+unique(matches$city)
+```
+
+
+```{r}
+unique(matches$winner)
+```
+
+```{r}
+hometeams = read.csv("hometeams.csv")
+#hometeams$ï..city
+colnames(hometeams)[colnames(hometeams) == 'ï..city'] <- 'city'
+```
+
+```{r}
+#drop unused factors
+matches$city = factor(matches$city)
+matches = matches[matches$winner != '', ]
+matches$winner = factor(matches$winner)
+
+#drop columns from matches
+drops = c('season', 'date', 'result', 'dl_applied', 'player_of_match', 'venue', 'umpire1', 'umpire2', 'umpire3')
+matches = matches[, !names(matches) %in% drops]
+```
+
+
+```{r}
+home.adv = right_join(matches, hometeams, by = 'city')
+home.adv$homewinner = ifelse(home.adv$hometeam == home.adv$winner, 1, 0)
+```
+
+```{r}
+home.adv$hometeam = factor(home.adv$hometeam)
+unique(home.adv$hometeam)
+```
+```{r}
+mean(home.adv$homewinner)
+```
+
+team1 + team2 + toss_winner + toss_decision + hometeam
+
+
+```{r}
+home.adv$awayteam = ifelse(as.character(home.adv$team1) == as.character(home.adv$hometeam), as.character(home.adv$team2), as.character(home.adv$team1))
+#typeof(home.adv$total_runs)
+home.adv$total_runs = as.numeric(home.adv$total_runs)
+```
+
+
+```{r}
+home.adv = home.adv[home.adv$inning == 1, ]
+```
+
++ toss_winner + toss_decision + awayteam + total_runs
+
+```{r}
+home.adv.logit = glm(homewinner ~ hometeam + awayteam + toss_winner + total_runs, data = home.adv, 
+                     family = binomial)
+summary(home.adv.logit)
+```
+
+
+```{r}
+#home.adv.logit = glm(homewinner ~ hometeam * awayteam * toss_winner * total_runs, data = home.adv, family = binomial)
+#summary(home.adv.logit)
+
+home.adv.pred = home.adv[, !names(home.adv) %in% c('homewinner')]
+
+sigmoid = function(x){
+ coe = coef(home.adv.logit)
+ 
+ total_coef = length(coe)
+ y = coe[1]
+ for(i in 2:total_coef)
+ {
+    y = y + coe[i] * x^(i-1)
+ }
+ 
+ return(inv.logit(y))
+}
+
+pred = predict(home.adv.logit, type = "response", newdata = home.adv.pred)
+
+predicted_logit_model_1 <- ifelse(pred > 0.54, 1, 0)
+
+accuracy <- mean(home.adv$homewinner == predicted_logit_model_1 )
+accuracy_df <- data.frame(Model = "Model Accuracy", Accuracy = accuracy, stringsAsFactors = FALSE)
+
+print(paste("Train accuracy for model :",round(accuracy*100,2),"%"))
+
+roc_obj = roc(response = home.adv$homewinner, predictor = predicted_logit_model_1, smoothed = TRUE)
+auc(roc_obj)
+plot(roc_obj, col="red", lwd=3, main="ROC curve")
+
+```
+
+```{r, fig.height=6, fig.width=8}
+ggplot(home.adv, aes(x = as.numeric(hometeam), y = as.numeric(pred))) +
+geom_jitter(height = 0.1, width = 0.25) +
+  facet_wrap(.~ awayteam, ncol = 4) +
+  ylab("Probability of winning") +
+  ggtitle("Analysis of matches between the Teams to find out Probability of Winning") +
+  labs(subtitle = "Facet by Away Team") +
+  scale_x_discrete(name="Home Team", limits=c("Chennai Super Kings", "Delhi Capitals", "Kings XI Punjab",
+                                         "Kolkata Knight Riders","Mumbai Indians", "Rajasthan Royals",
+                                         "Royal Challengers Bangalore","Sunrisers Hyderabad")) +
+  geom_smooth(method = 'loess', se = FALSE) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+```{r, fig.height=6, fig.width=8}
+ggplot(home.adv, aes(x = as.numeric(city), y = as.numeric(pred))) +
+geom_jitter(height = 0.1, width = 0.25) +
+  facet_wrap(.~ awayteam, ncol = 4) +
+  ylab("Probability of winning") +
+  labs(subtitle = "Facet by Away Team") +
+  geom_smooth(method = 'loess', se = FALSE) +
+  ggtitle("Performance of the Teams in Various cities") +
+  scale_x_discrete(name="City", limits=c("Bangalore", "Chandigarh", "Chennai","Delhi","Hyderabad",
+                                         "Jaipur","Kolkata","Mumbai")) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+From the graph above, we can see that the home advantage is used highly by Mumbai and Delhi while the same cannot be said about all other teams. All the other teams perform worse on their homeground as compared to away matches. The trend for Chenaai Super Kings clearly shows that their chances of winning on the homeground is very very less.
+
+
+
+```{r}
+g1 = summarize(group_by(home.adv, hometeam, toss_winner, awayteam), predict=mean(homewinner))
+ggplot(g1, aes(x = hometeam, y = toss_winner, z = predict)) +
+  geom_raster(aes(fill = predict),interpolate=TRUE) +
+  #geom_contour()+
+  scale_x_discrete()+
+  scale_y_discrete()
+
+
+g2 = summarize(group_by(home.adv, awayteam, toss_winner, hometeam), predict=mean(homewinner))
+ggplot(g2, aes(x = awayteam, y = toss_winner, z = predict)) +
+  geom_raster(aes(fill = predict),interpolate=TRUE) +
+  #geom_contour()+
+  scale_x_discrete()+
+  scale_y_discrete()
+```
+
+
+
+
+
+```{r, fig.height=7, fig.width=5}
+p1 = ggplot(home.adv,aes(x = total_runs, y = homewinner, color = homewinner)) + 
+  geom_point()+ geom_jitter(width = 0.3, height = 0.4) +
+  geom_smooth(method = 'lm', se = FALSE, color = "blue") +
+  stat_function(fun = sigmoid, color = 'red')
+
+p2 = ggplot(home.adv,aes(x = as.numeric(hometeam), y = homewinner, color = homewinner)) + 
+  geom_point()+ geom_jitter(width = 0.3, height = 0.4) +
+  geom_smooth(method = 'lm', se = FALSE, color = "blue") +
+  stat_function(fun = sigmoid, color = 'red')
+
+p3 = ggplot(home.adv,aes(x = as.numeric(toss_winner), y = homewinner, color = homewinner)) + 
+  geom_point()+ geom_jitter(width = 0.3, height = 0.4) +
+  geom_smooth(method = 'rlm', se = FALSE, color = "blue") +
+  stat_function(fun = sigmoid, color = 'red')
+    
+library(gridExtra)
+grid.arrange(p1,p2,p3,ncol = 1)
+```
+
+
+```{r}
+ggplot(home.adv,aes(x = as.numeric(hometeam), y = homewinner, color = homewinner)) + 
+  geom_point()+ geom_jitter(width = 0.3, height = 0.4) +
+  geom_smooth(method = 'lm', se = FALSE, color = "blue") 
+ 
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+JKFGGKHDFGFGJKSF
+
+```{r}
+india = readShapePoly("INDIA.shp")
+
+
+ggplot() + geom_polygon(data = india, aes(x = long, y = lat, group = group), colour = "black", fill = NA)+
+  geom_point(data = coordinates_india_subset,aes(x=lng,y=lat,color="Red"),size=coordinates_india_subset$home_ratio*25,alpha=0.7)+
+  geom_point(data = coordinates_india_subset,aes(x=lng,y=lat,color="Blue"),size=coordinates_india_subset$home_loss*25,alpha=0.5)+
+  geom_text(data=coordinates_india_subset,aes(x=lng, y=lat,label = Team_Name),position = "identity",aplha=2,size=5,check_overlap = TRUE)+scale_color_discrete(name = "Legend",labels = c("Away", "Home"))+ggtitle("Map showcasing Home and Away win ratio") + labs(subtitle="MI : Mumbai Indians \nCSK : Chennai Super Kings \nCSK : Chennai Super Kings \nDD : Delhi Daredevils \nKKR : Kolkata #Knight Riders \nSRH : Sunrisers Hyderabad \nRCB : Royal Challengers Bangalore  \nKXIP : Kings XI Punjab")
+```
+
+
+
+```{r}
+cor(home.adv$homewinner, as.numeric(home.adv$total_runs))
+```
+
+
+
+```{r}
+deliveries = read.csv("D:\\Semester-II\\Exploratory Data Analysis\\Assignments\\Final Project\\ipldata\\deliveries.csv")
+
+home.adv$id = numeric(home.adv$id)
+innings = left_join(home.adv, deliveries, by = 'id')
+```

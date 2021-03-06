@@ -1,0 +1,152 @@
+---
+title: "Final Project"
+author: "Vijeet"
+date: "4/21/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyverse)
+```
+
+## Question 1) 
+
+```{r}
+df.matches = read.csv("matches.csv")
+df.deliveries = read.csv("deliveries.csv")
+```
+
+
+
+```{r}
+teams <- df.deliveries %>% select(batting_team)%>%
+  distinct()
+teams <- rename(teams, team = batting_team)  
+
+teams <-teams[!(teams$team=="Kochi Tuskers Kerala"),]
+teams = as.data.frame(teams)
+teams <-teams[!(teams$team=="Pune Warriors"),]
+teams = as.data.frame(teams)
+teams <-teams[!(teams$team=="Rising Pune Supergiant"),]
+teams = as.data.frame(teams)
+teams <-teams[!(teams$team=="Rising Pune Supergiants"),]
+teams = as.data.frame(teams)
+teams <-teams[!(teams$team=="Gujarat Lions"),]
+teams = as.data.frame(teams)
+teams <-teams[!(teams$team=="Deccan Chargers"),]
+teams = as.data.frame(teams)
+teams <-teams[!(teams$team=="Gujarat Lions"),]
+teams = as.data.frame(teams)
+teams <-teams[!(teams$team=="Delhi Daredevils"),]
+teams = as.data.frame(teams)
+#teams[teams=="Deccan Chargers"]<-"Sunrisers Hyderabad"
+
+```
+
+```{r}
+s_team <- c("KKR","RCB","CSK","KXIP","RR","MI","DC","SRH")
+teams <- cbind(teams, s_team)
+```
+
+```{r fig.width=10, fig.height =10}
+dismissal <- df.deliveries%>%
+  left_join(df.matches, by=c("match_id"="id"))%>%
+   left_join(teams,by=c("batting_team"="teams"))%>%
+  filter(dismissal_kind!="")%>%
+  group_by(season,dismissal_kind,s_team)%>%
+  summarize(wickets =n())
+```
+
+```{r}
+no.dismissal = dismissal %>%
+  group_by(season) %>%
+  summarize(no_wickets = sum(wickets))
+```
+
+
+
+```{r}
+caught = dismissal %>%
+        group_by(season,dismissal_kind) %>%
+        filter(dismissal_kind == "caught") %>%
+        group_by(season,dismissal_kind) %>%
+        summarise(wickets = sum(wickets))
+
+```
+
+```{r}
+caught$total_wickets = no.dismissal$no_wickets
+
+```
+
+```{r}
+
+ggplot(caught, aes(x = season)) + geom_line(aes(y=wickets), colour="red", label = "caught") + geom_line(aes(y=total_wickets), colour="blue", label = "Total wickets") + 
+ ylab("wickets")+
+    scale_x_discrete(name="Season", limits=c(2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2019))+
+
+    ggtitle("No of wickets vs Caught over time")
+
+```
+
+
+```{r}
+df3 <- left_join(df.matches, df.deliveries, by = c("id"="match_id")) %>%
+        group_by(season) %>%
+  summarise(total_runs = sum(total_runs))
+
+ggplot(df3, aes(x = (season), y = total_runs)) + geom_line() +
+ ylab("runs")+
+    scale_x_discrete(name="Season", limits=c(2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2019))+
+    ggtitle("No of runs over time")
+
+
+ggplot(no.dismissal, aes(x = (season), y = no_wickets)) + geom_line() +
+ ylab("wickets")+
+    scale_x_discrete(name="Season", limits=c(2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2019))+
+    ggtitle("No of wickets over time")
+```
+
+```{r fig.width=8}
+batsmen<- df.deliveries%>%
+  left_join(df.matches, by=c("match_id"="id"))%>%
+        group_by(season,batsman)%>%
+ summarize(runs =max(sum(batsman_runs,na.rm=TRUE)))%>%
+  arrange(season,desc(runs))%>%
+  filter(runs==max(runs))
+
+ggplot(batsmen,aes(x=season,y=runs,colour=batsman,fill=batsman))+
+  geom_bar(position = "stack",  show.legend = FALSE, width = .6,stat="identity")+
+   geom_text(aes(label=batsman),position = position_stack(vjust = .5), color = "#FFFFFF") +
+    #geom_text(aes(label=batsman,hjust=-.25, colour="green"))+
+  theme(legend.position="none")+
+     coord_flip()+
+  scale_x_discrete(name="Season", limits=c(2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2019))+
+  ggtitle("Highest run scorers each season")
+```
+
+```{r}
+df.deliveries$wickets <- as.numeric(ifelse(df.deliveries$player_dismissed =="" ,"",1))
+
+bowler<- df.deliveries%>%
+  left_join(df.matches, by=c("match_id"="id"))%>%
+  filter(dismissal_kind!="run out")%>%
+        group_by(season,bowler)%>%
+ summarize(wicket =max(sum(wickets,na.rm=TRUE)))%>%
+  arrange(season,desc(wicket))%>%
+  filter(wicket==max(wicket))
+
+ggplot(bowler,aes(x=season,y=wicket,colour=bowler,fill=bowler))+
+  geom_bar(position = "stack",  show.legend = FALSE, width = .6,stat="identity")+
+  geom_text(aes(label=bowler),position = position_stack(vjust = .5), color = "#FFFFFF") +
+    #geom_text(aes(label=bowler,hjust=-.1, colour="green"))+
+  theme(legend.position="none")+
+  coord_cartesian(xlim = c(0, 50))+
+     coord_flip()+
+  scale_x_discrete(name="Season", limits=c(2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2019))+
+  ggtitle("Highest wickter takers each season")
+
+```
+
